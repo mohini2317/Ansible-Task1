@@ -1,0 +1,79 @@
+- hosts: docker
+  vars:
+          - url: "https://download.docker.com/linux/centos/7/x86_64/stable/"
+  tasks:
+          - name: confgure yum for docker
+            yum_repository:
+                    name: "docker"
+                    description: "yum docker repo"
+                    baseurl: "{{ url }}"
+                    gpgcheck: no
+
+          - name: Install docker software
+            package:
+                    name: "docker-ce-18.06.3.ce-3.el7.x86_64"
+                    state: present
+
+          - name: Start Docker service
+            service:
+                    name: "docker"
+                    state: started
+                    enabled: yes
+
+          - name: Install software python36
+            pip:
+                    name: docker-py
+
+          - name: pull docker image from Docker Hub
+            docker_image:
+                    name: httpd
+                    source: pull
+          - name: create directory for web files
+            file:
+                    path: "/root/web"
+                    state: directory
+
+          - name: copy web files
+            copy:
+                    src: "/root/home.html"
+                    dest: "/root/web/"
+
+          - name: Allow rules for docker
+            firewalld:
+                    masquerade: yes
+                    zone: public
+                    permanent: yes
+                    state: enabled
+
+          - name: Allow 8888 port on Managed Node
+            firewalld:
+                    zone: public
+                    port: "8888/tcp"
+                    permanent: yes
+                    state: enabled
+
+          - name: Restart firewalld
+            service:
+                    name: "firewalld"
+                    state: restarted
+
+          - name: Restart docker service
+            service:
+                    name: "docker"
+                    state: restarted
+
+          - name: Launching HTTPD container and Exposing
+            docker_container:
+                    name: "httpd_container"
+                    image: "httpd"
+                    volumes:
+                            - /root/web/:/usr/local/apache2/htdocs
+                    exposed_ports:
+                            - "80"
+                    ports:
+                            - "8888:80"
+            register: output
+          - debug:
+                  var: output
+
+
